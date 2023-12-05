@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib",
+    "target": "es2022",
+    // node16 is in effect the strictest mode available, this should allow
+    // the use of the output in most environments.
+    "module": "node16",
+    "lib": ["es2022", "dom", "dom.iterable"],
+    "types": [],
+
+    "strict": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "forceConsistentCasingInFileNames": true,
+    "composite": true,
+  },
+  "include": ["src"],
+  "references": [
+    { "path": "tsconfig.test.json" },
+  ],
+}
