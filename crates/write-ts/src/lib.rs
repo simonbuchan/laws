@@ -13,6 +13,37 @@ enum Protocol {
     RestXml,
 }
 
+impl Protocol {
+    fn from_service_traits(traits: &schema::ServiceTraits) -> Result<Self> {
+        if traits.protocols_aws_json_1_0.is_some() {
+            Ok(Protocol::AwsJson1_0)
+        } else if traits.protocols_aws_json_1_1.is_some() {
+            Ok(Protocol::AwsJson1_1)
+        } else if traits.protocols_aws_query.is_some() {
+            Ok(Protocol::AwsQuery)
+        } else if traits.protocols_ec2_query.is_some() {
+            Ok(Protocol::Ec2Query)
+        } else if traits.protocols_rest_json_1.is_some() {
+            Ok(Protocol::RestJson1)
+        } else if traits.protocols_rest_xml.is_some() {
+            Ok(Protocol::RestXml)
+        } else {
+            miette::bail!("unimplemented or missing protocol");
+        }
+    }
+
+    fn import_path(&self) -> &str {
+        match self {
+            Protocol::AwsJson1_0 => "../protocols/awsJson1_0.js",
+            Protocol::AwsJson1_1 => "../protocols/awsJson1_1.js",
+            Protocol::AwsQuery => "../protocols/awsQuery.js",
+            Protocol::Ec2Query => "../protocols/ec2Query.js",
+            Protocol::RestJson1 => "../protocols/restJson1.js",
+            Protocol::RestXml => "../protocols/restXml.js",
+        }
+    }
+}
+
 pub fn write_service(model: &schema::Model, path: &Path) -> Result<()> {
     use std::fs;
     use std::io::Write;
@@ -36,80 +67,28 @@ pub fn write_service(model: &schema::Model, path: &Path) -> Result<()> {
         })
         .ok_or(miette::diagnostic!("no service found in model"))?;
 
-    let protocol;
-    if service.traits.protocols_aws_json_1_0.is_some() {
-        protocol = Protocol::AwsJson1_0;
-        writeln!(
-            f,
-            r#"import * as protocol from "../protocols/awsJson1_0.js";"#,
-        )
-        .into_diagnostic()?;
-    } else if service.traits.protocols_aws_json_1_1.is_some() {
-        protocol = Protocol::AwsJson1_1;
-        writeln!(
-            f,
-            r#"import * as protocol from "../protocols/awsJson1_1.js";"#,
-        )
-        .into_diagnostic()?;
-    } else if service.traits.protocols_aws_query.is_some() {
-        protocol = Protocol::AwsQuery;
-        writeln!(
-            f,
-            r#"import * as protocol from "../protocols/awsQuery.js";"#,
-        )
-        .into_diagnostic()?;
-    } else if service.traits.protocols_ec2_query.is_some() {
-        protocol = Protocol::Ec2Query;
-        writeln!(
-            f,
-            r#"import * as protocol from "../protocols/ec2Query.js";"#,
-        )
-        .into_diagnostic()?;
-    } else if service.traits.protocols_rest_json_1.is_some() {
-        protocol = Protocol::RestJson1;
-        writeln!(
-            f,
-            r#"import * as protocol from "../protocols/restJson1.js";"#,
-        )
-        .into_diagnostic()?;
-    } else if service.traits.protocols_rest_xml.is_some() {
-        protocol = Protocol::RestXml;
-        writeln!(f, r#"import * as protocol from "../protocols/restXml.js";"#,)
-            .into_diagnostic()?;
-    } else {
-        miette::bail!("unimplemented or missing protocol");
-    }
+    let protocol = Protocol::from_service_traits(&service.traits)?;
 
-    writeln!(f, r#"import type {{ ClientConfig }} from "../service.js";"#,).into_diagnostic()?;
+    writeln!(
+        f,
+        r#"import * as __protocol from {path:?};"#,
+        path = protocol.import_path()
+    )
+    .into_diagnostic()?;
+    writeln!(f, r#"import type * as __service from "../service.js";"#,).into_diagnostic()?;
 
     if service.traits.auth_sigv4.is_some() {
-        writeln!(f, r#"import {{ authenticate }} from "../auth/sigv4.js";"#,).into_diagnostic()?;
+        writeln!(f, r#"import * as __sigv4 from "../auth/sigv4.js";"#,).into_diagnostic()?;
     }
     writeln!(f).into_diagnostic()?;
 
     // Write service config
-    writeln!(f, r#"const service: protocol.ServiceConfig = {{"#).into_diagnostic()?;
+    writeln!(f, r#"const service: __protocol.ServiceConfig = {{"#).into_diagnostic()?;
     match protocol {
         Protocol::AwsJson1_0 | Protocol::AwsJson1_1 => {
             writeln!(f, r#"  targetPrefix: {service_name:?},"#).into_diagnostic()?;
         }
-        Protocol::AwsQuery => {
-            let namespace = service
-                .traits
-                .xml_namespace
-                .as_ref()
-                .ok_or(miette::diagnostic!(
-                    "no smithy.api#xmlNamespace service trait with aws.protocols#awsQuery"
-                ))?;
-            writeln!(
-                f,
-                r#"  xmlNamespace: {namespace:?},"#,
-                namespace = namespace.uri
-            )
-            .into_diagnostic()?;
-            if let Some(prefix) = &namespace.prefix {
-                writeln!(f, r#"  xmlNamespacePrefix: {prefix:?},"#).into_diagnostic()?;
-            }
+        Protocol::AwsQuery | Protocol::Ec2Query => {
             writeln!(f, r#"  version: {version:?},"#, version = service.version)
                 .into_diagnostic()?;
         }
@@ -131,11 +110,7 @@ pub fn write_service(model: &schema::Model, path: &Path) -> Result<()> {
                 writeln!(f, r#"  xmlNamespacePrefix: {prefix:?},"#).into_diagnostic()?;
             }
         }
-        _ => {}
-    }
-    match protocol {
-        Protocol::AwsQuery | Protocol::RestXml => {}
-        _ => {}
+        Protocol::RestJson1 => {}
     }
     writeln!(f, "}};").into_diagnostic()?;
     writeln!(f).into_diagnostic()?;
@@ -145,8 +120,8 @@ pub fn write_service(model: &schema::Model, path: &Path) -> Result<()> {
     writeln!(
         f,
         r#"export async function send<const Name extends keyof OperationMap>(
-    client: ClientConfig,
-    operation: protocol.OperationConfig,
+    client: __service.ClientConfig,
+    operation: __protocol.OperationConfig,
     input: OperationMap[Name]['input'],
 ): Promise<OperationMap[Name]['output']> {{"#
     )
@@ -162,7 +137,7 @@ pub fn write_service(model: &schema::Model, path: &Path) -> Result<()> {
     writeln!(
         f,
         r#"  const endpoint = `{endpoint_prefix}.${{client.region}}.amazonaws.com`;
-  let request = protocol.inputRequest(service, endpoint, operation, input);"#
+  let request = __protocol.inputRequest(service, endpoint, operation, input);"#
     )
     .into_diagnostic()?;
 
@@ -171,7 +146,7 @@ pub fn write_service(model: &schema::Model, path: &Path) -> Result<()> {
     if let Some(auth) = &service.traits.auth_sigv4 {
         writeln!(
             f,
-            "  request = await authenticate(request, client, {{ name: {name:?} }});",
+            "  request = await __sigv4.authenticate(request, client, {{ name: {name:?} }});",
             name = auth.name
         )
         .into_diagnostic()?;
@@ -185,7 +160,7 @@ pub fn write_service(model: &schema::Model, path: &Path) -> Result<()> {
     throw new Error(`HTTP ${{response.status}} ${{response.statusText}}:\n${{body}}`);
   }}
 
-  return await protocol.outputResult(service, operation, response) as OperationMap[Name]['output'];
+  return await __protocol.outputResult(service, operation, response) as OperationMap[Name]['output'];
 }}
 "#
     )
@@ -218,21 +193,23 @@ pub fn write_service(model: &schema::Model, path: &Path) -> Result<()> {
 
             writeln!(
                 f,
-                r#"export async function {name}(client: ClientConfig, input: {input}): Promise<{output}> {{"#
+                r#"export async function {name}(
+  client: __service.ClientConfig,
+  input: {input},
+): Promise<{output}> {{
+  const operation: __protocol.OperationConfig = "#
             )
             .into_diagnostic()?;
+
             match protocol {
                 Protocol::AwsJson1_0 | Protocol::AwsJson1_1 => {
-                    writeln!(f, "  const operation: protocol.OperationConfig = {name:?};")
-                        .into_diagnostic()?;
+                    writeln!(f, "{name:?};").into_diagnostic()?;
                 }
-                Protocol::AwsQuery => {
-                    writeln!(
-                        f,
-                        "  const operation: protocol.OperationConfig = {{ action: {name:?}, output: {output_name:?} }};",
-                        output_name = shape_id_to_ts(&shape.output.target),
-                    )
-                    .into_diagnostic()?;
+                Protocol::AwsQuery | Protocol::Ec2Query => {
+                    let output_name = shape_id_to_ts(&shape.output.target);
+                    let output_name = output_name.strip_suffix("Response").unwrap_or(output_name);
+                    writeln!(f, "{{ action: {name:?}, output: {output_name:?} }};",)
+                        .into_diagnostic()?;
                 }
                 Protocol::RestJson1 => {
                     let http = shape.traits.http.as_ref().ok_or(miette::diagnostic!(
@@ -244,30 +221,29 @@ pub fn write_service(model: &schema::Model, path: &Path) -> Result<()> {
                     let path = http.uri.replace('{', "${input.").replace("+}", "}");
                     writeln!(
                         f,
-                        "  const operation: protocol.OperationConfig = {{ method: {method:?}, path: `{path}` }};",
+                        "{{ method: {method:?}, path: `{path}` }};",
                         method = http.method,
                     )
-                        .into_diagnostic()?;
+                    .into_diagnostic()?;
                 }
                 Protocol::RestXml => {
                     let http = shape.traits.http.as_ref().ok_or(miette::diagnostic!(
                         "no http trait for operation with protocols#restXml"
                     ))?;
 
+                    let input_name = shape_id_to_ts(&shape.input.target);
+                    let output_name = shape_id_to_ts(&shape.output.target);
+                    let output_name = output_name.strip_suffix("Response").unwrap_or(output_name);
+
                     // expand "/foo/{bar}" => `/foo/${input.bar}`,
                     //    and "/foo/{bar+}/baz" => `/foo/${input.bar/baz`
                     let path = http.uri.replace('{', "${input.").replace("+}", "}");
                     writeln!(
                         f,
-                        "  const operation: protocol.OperationConfig = {{ input: {input_name:?}, output: {output_name:?}, method: {method:?}, path: `{path}` }};",
-                        input_name = shape_id_to_ts(&shape.input.target),
-                        output_name = shape_id_to_ts(&shape.output.target),
+                        "{{ input: {input_name:?}, output: {output_name:?}, method: {method:?}, path: `{path}` }};",
                         method = http.method,
                     )
                     .into_diagnostic()?;
-                }
-                _ => {
-                    miette::bail!("unimplemented protocol");
                 }
             }
             writeln!(
@@ -307,7 +283,7 @@ pub fn write_service(model: &schema::Model, path: &Path) -> Result<()> {
                 .replace('.', "?."); // e.g. output.EngineDefaults?.Marker;
 
             writeln!(f, "export async function* paginate{name}(").into_diagnostic()?;
-            writeln!(f, "  clientConfig: ClientConfig,").into_diagnostic()?;
+            writeln!(f, "  clientConfig: __service.ClientConfig,").into_diagnostic()?;
             writeln!(f, "  input: {input},").into_diagnostic()?;
             writeln!(f, "): AsyncIterable<{output}> {{").into_diagnostic()?;
             writeln!(f, "  let token: {input}[{input_token:?}] = undefined;").into_diagnostic()?;

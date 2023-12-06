@@ -33,14 +33,9 @@ export function inputRequest(
 }
 
 export async function outputResult(
-  service: ServiceConfig,
+  _service: ServiceConfig,
   operation: OperationConfig,
   response: Response,
 ): Promise<unknown> {
-  return xml.parseResponse(
-    await response.text(),
-    operation.output,
-    service.xmlNamespace,
-    service.xmlNamespacePrefix,
-  );
+  return xml.parseResponse(await response.text(), operation.output);
 }

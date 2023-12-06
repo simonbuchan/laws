@@ -30,8 +30,8 @@ export function inputRequest(
 
 export async function outputResult(
   _service: ServiceConfig,
-  operation: OperationConfig,
+  _operation: OperationConfig,
   response: Response,
 ): Promise<unknown> {
-  return xml.parseResponse(await response.text(), operation.output);
+  return xml.parseResponseEc2(await response.text());
 }

@@ -73,12 +73,7 @@ function formatObject(json: unknown, parent: XmlElement) {
  *
  * Into an object with the Result element as the root and ResponseMetadata
  */
-export function parseResponse(
-  source: string,
-  name: string,
-  namespace: string,
-  prefix: string | undefined,
-): unknown {
+export function parseResponse(source: string, name: string): unknown {
   const document = parseXml(source);
   const root = document.root;
   if (!root) {
@@ -86,17 +81,29 @@ export function parseResponse(
   }
   const result = root.children.find(
     (child): child is XmlElement =>
-      child instanceof XmlElement && child.name === name,
+      child instanceof XmlElement && child.name === `${name}Result`,
   );
   const metadata = root.children.find(
     (child): child is XmlElement =>
       child instanceof XmlElement && child.name === "ResponseMetadata",
   );
+  if (!result) {
+    throw new Error(`Missing ${name}Result element in response:\n${source}`);
+  }
 
   return {
     ...xmlNodeToJson(result),
     $metadata: xmlNodeToJson(metadata),
   };
+}
+
+export function parseResponseEc2(source: string): unknown {
+  const document = parseXml(source);
+  const root = document.root;
+  if (!root) {
+    throw new Error("Missing root element");
+  }
+  return xmlNodeToJson(root);
 }
 
 function xmlNodeToJson(node: XmlElement): Record<string, unknown>;
