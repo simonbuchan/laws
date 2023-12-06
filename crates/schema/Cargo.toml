@@ -1,5 +1,5 @@
 [package]
-name = "schema"
+name = "laws-schema"
 version = "0.1.0"
 edition = "2021"
 
@@ -8,4 +8,4 @@ edition = "2021"
 [dependencies]
 indexmap = { version = "2.1.0", features = ["serde"] }
 serde = { version = "1.0.193", features = ["derive"] }
-serde_json = "1.0.108"
+serde_json = { workspace = true }

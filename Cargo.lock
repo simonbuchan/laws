@@ -72,19 +72,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
-name = "aws-client-gen"
-version = "0.1.0"
-dependencies = [
- "clap",
- "fetch-models",
- "miette",
- "rayon",
- "schema",
- "serde_json",
- "write-ts",
-]
-
-[[package]]
 name = "backtrace"
 version = "0.3.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -232,14 +219,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fetch-models"
-version = "0.1.0"
-dependencies = [
- "git2",
- "miette",
-]
-
-[[package]]
 name = "form_urlencoded"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -338,6 +317,44 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8c37f63953c4c63420ed5fd3d6d398c719489b9f872b9fa683262f8edd363c7d"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "laws-fetch-models"
+version = "0.1.0"
+dependencies = [
+ "git2",
+ "miette",
+]
+
+[[package]]
+name = "laws-gen"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "laws-fetch-models",
+ "laws-schema",
+ "laws-write-ts",
+ "miette",
+ "rayon",
+ "serde_json",
+]
+
+[[package]]
+name = "laws-schema"
+version = "0.1.0"
+dependencies = [
+ "indexmap",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "laws-write-ts"
+version = "0.1.0"
+dependencies = [
+ "laws-schema",
+ "miette",
 ]
 
 [[package]]
@@ -567,15 +584,6 @@ name = "ryu"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ad4cc8da4ef723ed60bced201181d83791ad433213d8c24efffda1eec85d741"
-
-[[package]]
-name = "schema"
-version = "0.1.0"
-dependencies = [
- "indexmap",
- "serde",
- "serde_json",
-]
 
 [[package]]
 name = "scopeguard"
@@ -930,11 +938,3 @@ name = "windows_x86_64_msvc"
 version = "0.52.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dff9641d1cd4be8d1a070daf9e3773c5f67e78b4d9d42263020c057706765c04"
-
-[[package]]
-name = "write-ts"
-version = "0.1.0"
-dependencies = [
- "miette",
- "schema",
-]

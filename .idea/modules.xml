@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/aws-client-gen.iml" filepath="$PROJECT_DIR$/.idea/aws-client-gen.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/laws.iml" filepath="$PROJECT_DIR$/.idea/laws.iml" />
     </modules>
   </component>
 </project>

@@ -6,6 +6,7 @@
       <sourceFolder url="file://$MODULE_DIR$/crates/schema/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/write-ts/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/gen/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/.aws-sdk.git" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
       <excludeFolder url="file://$MODULE_DIR$/ts-client/lib" />

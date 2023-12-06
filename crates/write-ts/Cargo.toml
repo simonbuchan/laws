@@ -1,5 +1,5 @@
 [package]
-name = "write-ts"
+name = "laws-write-ts"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,4 +7,4 @@ edition = "2021"
 
 [dependencies]
 miette = { workspace = true }
-schema = { workspace = true }
+laws-schema = { path = "../schema" }

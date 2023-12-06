@@ -10,6 +10,12 @@ mod shape_id;
 mod shapes;
 mod traits;
 
+// Pushes the monomorphization of the serde::Deserialize trait down to this crate,
+// which makes it a bit faster to recompile after changes outside this crate.
+pub fn parse_model(source: &str) -> serde_json::Result<Model> {
+    serde_json::from_str(source)
+}
+
 #[derive(Debug, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Model {

@@ -7,6 +7,8 @@ use std::path::Path;
 use miette::{IntoDiagnostic, Result, WrapErr};
 use rayon::prelude::*;
 
+use laws_schema as schema;
+
 #[derive(Parser)]
 struct Args {
     #[clap(subcommand)]
@@ -30,7 +32,7 @@ fn main() -> Result<()> {
     let args = Args::parse();
     if matches!(args.command, Some(Command::FetchModels)) || !models_path.exists() {
         println!("fetching models to {}", models_path.display());
-        fetch_models::fetch_models(models_path).wrap_err("fetching models")?;
+        laws_fetch_models::fetch_models(models_path).wrap_err("fetching models")?;
     }
 
     match args.command {
@@ -43,58 +45,7 @@ fn main() -> Result<()> {
             dump_endpoint_rules(&model, &EndpointRulesFilter::default())?;
         }
         None | Some(Command::WriteTs) => {
-            println!("writing ts services to {ts_services_dir_path:?}");
-            match fs::remove_dir_all(ts_services_dir_path) {
-                Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
-                result => {
-                    result
-                        .into_diagnostic()
-                        .wrap_err("removing ts-client/services")?;
-                }
-            };
-
-            fs::read_dir(models_path)
-                .into_diagnostic()?
-                .par_bridge()
-                .into_par_iter()
-                .try_for_each(|entry| -> Result<()> {
-                    let entry = entry.into_diagnostic()?;
-                    if entry.file_type().into_diagnostic()?.is_file() {
-                        let model_path = entry.path();
-                        if model_path
-                            .extension()
-                            .map(|ext| ext == "json")
-                            .unwrap_or_default()
-                        {
-                            let model = parse_model(&model_path)?;
-
-                            fs::create_dir_all(ts_services_dir_path).into_diagnostic()?;
-
-                            let mut ts_service_path = ts_services_dir_path.join(entry.file_name());
-                            ts_service_path.set_extension("ts");
-                            if let Err(error) = write_ts::write_service(&model, &ts_service_path)
-                                .wrap_err_with(|| format!("writing {ts_service_path:?}"))
-                            {
-                                // It's way too hard to get miette to render a graphical report
-                                let handler = miette::GraphicalReportHandler::new();
-                                let mut output = String::new();
-                                handler
-                                    .render_report(&mut output, error.as_ref())
-                                    .into_diagnostic()?;
-                                std::eprint!("{output}");
-                                fs::remove_file(&ts_service_path).into_diagnostic()?;
-                            } else {
-                                const ANSI_GREEN: &str = "\x1b[32m";
-                                const ANSI_RESET: &str = "\x1b[0m";
-                                const TICK: &str = "\u{2713}";
-                                println!(
-                                    "  {ANSI_GREEN}{TICK}{ANSI_RESET} wrote {ts_service_path:?}"
-                                );
-                            }
-                        }
-                    }
-                    Ok(())
-                })?;
+            write_ts(models_path, ts_services_dir_path)?;
         }
     }
 
@@ -106,11 +57,66 @@ fn parse_model(path: &Path) -> Result<schema::Model> {
         .into_diagnostic()
         .wrap_err_with(|| format!("reading {path:?}"))?;
 
-    let model: schema::Model = serde_json::from_str(&source)
+    let model: schema::Model = schema::parse_model(&source)
         .into_diagnostic()
         .wrap_err_with(|| format!("parsing {path:?}"))?;
 
     Ok(model)
+}
+
+fn write_ts(models_path: &Path, ts_services_dir_path: &Path) -> Result<()> {
+    println!("writing ts services to {ts_services_dir_path:?}");
+    match fs::remove_dir_all(ts_services_dir_path) {
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+        result => {
+            result
+                .into_diagnostic()
+                .wrap_err("removing ts-client/services")?;
+        }
+    };
+
+    fs::read_dir(models_path)
+        .into_diagnostic()?
+        .par_bridge()
+        .into_par_iter()
+        .try_for_each(|entry| -> Result<()> {
+            let entry = entry.into_diagnostic()?;
+            if entry.file_type().into_diagnostic()?.is_file() {
+                let model_path = entry.path();
+                if model_path
+                    .extension()
+                    .map(|ext| ext == "json")
+                    .unwrap_or_default()
+                {
+                    let model = parse_model(&model_path)?;
+
+                    fs::create_dir_all(ts_services_dir_path).into_diagnostic()?;
+
+                    let mut ts_service_path = ts_services_dir_path.join(entry.file_name());
+                    ts_service_path.set_extension("ts");
+                    if let Err(error) = laws_write_ts::write_service(&model, &ts_service_path)
+                        .wrap_err_with(|| format!("writing {ts_service_path:?}"))
+                    {
+                        // It's way too hard to get miette to render a graphical report
+                        let handler = miette::GraphicalReportHandler::new();
+                        let mut output = String::new();
+                        handler
+                            .render_report(&mut output, error.as_ref())
+                            .into_diagnostic()?;
+                        std::eprint!("{output}");
+                        fs::remove_file(&ts_service_path).into_diagnostic()?;
+                    } else {
+                        const ANSI_GREEN: &str = "\x1b[32m";
+                        const ANSI_RESET: &str = "\x1b[0m";
+                        const TICK: &str = "\u{2713}";
+                        println!("  {ANSI_GREEN}{TICK}{ANSI_RESET} wrote {ts_service_path:?}");
+                    }
+                }
+            }
+            Ok(())
+        })?;
+
+    Ok(())
 }
 
 #[derive(Default)]
@@ -193,7 +199,7 @@ fn dump_endpoint_rules(model: &schema::Model, filter: &EndpointRulesFilter) -> R
                                     disable_double_encoding,
                                 } => {
                                     println!("{:indent$}    sigv4a({signing_name}, [{signing_region_set}], {disable_double_encoding})", "",
-                                    signing_region_set = signing_region_set.join(", "));
+                                             signing_region_set = signing_region_set.join(", "));
                                 }
                                 schema::EndpointAuthScheme::Sigv4S3Express {
                                     signing_name,

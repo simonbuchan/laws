@@ -2,6 +2,8 @@ use std::path::Path;
 
 use miette::{IntoDiagnostic, Result};
 
+use laws_schema as schema;
+
 enum Protocol {
     AwsJson1_0,
     AwsJson1_1,

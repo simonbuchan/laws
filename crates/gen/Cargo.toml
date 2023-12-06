@@ -1,0 +1,16 @@
+[package]
+name = "laws-gen"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+clap = { version = "4.4.11", features = ["derive"] }
+miette = { workspace = true, features = ["fancy"] }
+rayon = "1.8.0"
+serde_json = { workspace = true }
+
+laws-fetch-models = { path = "../fetch-models" }
+laws-schema = { path = "../schema" }
+laws-write-ts = { path = "../write-ts" }
